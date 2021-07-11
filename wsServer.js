@@ -51,22 +51,18 @@ const { Server } = require("socket.io");
 const io = new Server(server, {
   cors: {},
 });
-const axios = require("axios");
+
+const messageService = require('./src/messages');
 
 io.on("connection", (socket) => {
-  socket.on("new_message", (data) => {
-    axios
-      .post(config.restURl + "/api/message/post", {
-        jwt: data.token,
-        content: data.content,
-      })
-      .then((result) => {
-        io.sockets.emit("message", result.data);
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  });
+  console.log(socket.id, " is connected")
+  socket.on("new_message", (data) => messageService.newMessage(data, socket));
+
+
+
+  socket.on('disconnect', (reason) => {
+    console.log(socket.id, " disconnected: ", reason)
+  })
 });
 
 server.listen(port);
