@@ -3,7 +3,11 @@ const http = require("http");
 const express = require("express");
 const app = express();
 
-const ChatServer = new (require('./chat-utils'))("WS", app, config.wsServerPort);
+const ChatServer = new (require("./chat-utils"))(
+  "WS",
+  app,
+  config.wsServerPort
+);
 
 const { Server } = require("socket.io");
 const io = new Server(ChatServer, {
@@ -13,9 +17,35 @@ const io = new Server(ChatServer, {
 const messageService = require("./src/messages");
 const axios = require("axios");
 
+const handle_error = (err) => {
+  let header = err.request._header.split(" ");
+  ChatServer.log(
+    header[0],
+    "|",
+    header[1],
+    "|",
+    err.response.status,
+    "|",
+    err.response.data
+  );
+};
 
 io.on("connection", (socket) => {
-  ChatServer.log(socket.id, " is connected");
+  //Token authentificatio
+  axios
+    .get(config.restURl + "/api/user/me", {
+      headers: {
+        Authorization : socket.handshake.headers.jwt
+      }
+    })
+    .then((res) => {
+      console.log(res.data.username, "is connected");
+    })
+    .catch((err) => {
+      handle_error(err);
+      socket.emit("auth_feedback", { error : "jwt expired"});
+    });
+  //Message
   socket.on("new_message", (data) => {
     ChatServer.log(socket.id, " send:", data.content);
     axios
@@ -27,8 +57,7 @@ io.on("connection", (socket) => {
         io.sockets.emit("message", result.data);
       })
       .catch((err) => {
-        ChatServer.log("Error when requesting API: ", err.code);
-        ChatServer.log(err);
+        handle_error(err)
       });
   });
 
